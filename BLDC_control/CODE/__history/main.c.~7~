@@ -1,0 +1,60 @@
+#include <main.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#define bat_tat PIN_B4
+#define thuan_nghich PIN_B5
+#device adc=10
+char yeucau;
+int tocdo=0, state=0, dir=0;
+unsigned int pwm=0;
+void main()
+{
+   set_tris_b(0xff);
+   //option_reg=0;
+   set_tris_d(0);
+   set_tris_a(0x01);
+   setup_adc_ports(sAN0);
+   setup_adc(ADC_CLOCK_INTERNAL);
+   set_adc_channel(0);
+   //adc_init();
+   //l=adc_get_sample(0);
+   while(TRUE)
+   {
+      tocdo=read_adc();
+      if(input(bat_tat)==0)
+      {
+         delay_ms(50);
+         if(input(bat_tat)==0)
+         {
+            while(input(bat_tat)==0);
+            state=~state;
+         }
+      }
+      if(input(thuan_nghich)==0)
+      {
+         delay_ms(50);
+         if(input(thuan_nghich)==0)
+         {
+            while(input(thuan_nghich)==0);
+            dir=~dir;
+         }
+      }
+      if(state==0)
+      {
+         output_d(0xff);
+      }
+      else if(dir==1)
+      {
+         output_d(quaythuan[step]);
+         delay_ms(100);
+
+       }  
+         else
+       {
+         output_d(quaynghich[step]);
+         delay_ms(100);
+
+        }     
+
+}

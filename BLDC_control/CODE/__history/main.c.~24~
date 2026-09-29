@@ -1,0 +1,256 @@
+/*#include <main.h>
+// Ð?m b?o trong main.h ho?c t?i dây dã khai báo #device adc=10
+
+#define bat_tat PIN_B4
+#define thuan_nghich PIN_B5
+#define HallA PIN_B0
+#define HallB PIN_B1
+#define HallC PIN_B2
+
+// Khai báo bi?n
+unsigned int16 tocdo=0; // Dùng int16 cho ADC 10-bit
+unsigned int16 pwm_val=0;
+int1 state=0; // Dùng int1 ti?t ki?m b? nh? cho bi?n tr?ng thái
+int1 dir=0;
+int1 a, b, c;
+
+void quaythuan()
+{
+   // S? d?ng && cho logic chu?n
+   if (a==1 && b==0 && c==1) {output_d(0b00010001);} // AH, BL
+   else if (a==1 && b==0 && c==0) {output_d(0b00100001);} // AH, CL
+   else if (a==1 && b==1 && c==0) {output_d(0b00100010);} // BH, CL
+   else if (a==0 && b==1 && c==0) {output_d(0b00001010);} // BH, AL
+   else if (a==0 && b==1 && c==1) {output_d(0b00001100);} // CH, AL
+   else if (a==0 && b==0 && c==1) {output_d(0b00010100);} // CH, BL
+}
+
+void quaynghich()
+{
+   if (a==1 && b==0 && c==1) {output_d(0b00100001);}
+   else if (a==1 && b==0 && c==0) {output_d(0b00010001);}
+   else if (a==1 && b==1 && c==0) {output_d(0b00001100);}
+   else if (a==0 && b==1 && c==0) {output_d(0b00010100);}
+   else if (a==0 && b==1 && c==1) {output_d(0b00100010);}
+   else if (a==0 && b==0 && c==1) {output_d(0b00001010);}
+}
+
+void main()
+{
+   set_tris_b(0xff); // Port B Input
+   set_tris_d(0x00); // Port D Output
+   set_tris_c(0x00); // Port C Output (cho PWM)
+   set_tris_a(0xff); // Port A Input
+
+   // Kích ho?t di?n tr? treo cho Port B (quan tr?ng cho nút nh?n n?i d?t)
+   port_b_pullups(TRUE); 
+
+   setup_adc_ports(sAN0);
+   setup_adc(ADC_CLOCK_INTERNAL);
+   set_adc_channel(0);
+
+   // Timer 2: Prescaler 16, Period 255 => Max PWM value cho l?nh set là 1023
+   setup_timer_2(T2_DIV_BY_16, 255, 1);
+   setup_ccp1(CCP_PWM);
+
+   // Kh?i t?o tr?ng thái d?ng an toàn
+   output_d(0x00); 
+   set_pwm1_duty(0);
+
+   while(TRUE)
+   {
+      // 1. C?P NH?T C?M BI?N (Ph?i n?m trong vòng l?p)
+      a = input(HallA);
+      b = input(HallB);
+      c = input(HallC);
+
+      // 2. X? lý t?c d?
+      tocdo = read_adc();
+      // Logic ngu?c do chân SD: ADC càng l?n -> PWM càng l?n -> SD càng t?t -> Ð?ng co ch?m
+      // N?u mu?n thu?n chi?u kim d?ng h? bi?n tr?, hãy d?o giá tr?:
+      pwm_val = tocdo; 
+      set_pwm1_duty(pwm_val);
+
+      // 3. X? lý nút B?t/T?t
+      if(input(bat_tat)==0)
+      {
+         delay_ms(20);
+         if(input(bat_tat)==0)
+         {
+            while(input(bat_tat)==0); // Ch? nh? phím
+            state = !state;
+         }
+      }
+
+      // 4. X? lý nút Ð?o chi?u
+      if(input(thuan_nghich)==0)
+      {
+         delay_ms(20);
+         if(input(thuan_nghich)==0)
+         {
+            while(input(thuan_nghich)==0);
+            dir = !dir;
+         }
+      }
+
+      // 5. Ði?u khi?n Output
+      if(state==0) // Tr?ng thái T?T
+      {
+         output_d(0x00); // T?t toàn b? MOSFET d? tránh ng?n m?ch
+      }
+      else // Tr?ng thái B?T
+      {
+         if(dir==0) quaythuan();
+         else quaynghich();
+      }     
+   }
+}
+*/
+#include <main.h>
+
+//================= KHAI BÁO =================
+#define BAT_TAT       PIN_B4
+#define THUAN_NGHICH  PIN_B5
+
+#define HALL_A        PIN_B0
+#define HALL_B        PIN_B1
+#define HALL_C        PIN_B2
+
+#define SD_PWM        PIN_C2   // CCP1 PWM -> SD IR2112
+
+unsigned int16 adc_val;
+int1 state = 0;
+int1 dir = 0;
+int1 a, b, c;
+
+void fake_hall_rotate()
+{
+   static int8 step = 0;
+   int8 hall_table[6] = {0b101,0b100,0b110,0b010,0b011,0b001};
+
+   a = (hall_table[step] >> 2) & 1;
+   b = (hall_table[step] >> 1) & 1;
+   c = hall_table[step] & 1;
+
+   step++;
+   if(step >= 6) step = 0;
+   delay_ms(5);
+}
+//================= DEAD TIME =================
+void commutate(int8 mask)
+{
+   output_d(0x00);
+   delay_us(5);        // dead-time
+   output_d(mask);
+}
+
+//================= QUAY THU?N =================
+void quay_thuan()
+{
+   if(a && !b &&  c) commutate(0b00010001); // AH BL
+   else if(a && !b && !c) commutate(0b00100001); // AH CL
+   else if(a &&  b && !c) commutate(0b00100010); // BH CL
+   else if(!a &&  b && !c) commutate(0b00001010); // BH AL
+   else if(!a &&  b &&  c) commutate(0b00001100); // CH AL
+   else if(!a && !b &&  c) commutate(0b00010100); // CH BL
+}
+
+//================= QUAY NGH?CH =================
+void quay_nghich()
+{
+   if(a && !b &&  c) commutate(0b00100001);
+   else if(a && !b && !c) commutate(0b00010001);
+   else if(a &&  b && !c) commutate(0b00001100);
+   else if(!a &&  b && !c) commutate(0b00010100);
+   else if(!a &&  b &&  c) commutate(0b00100010);
+   else if(!a && !b &&  c) commutate(0b00001010);
+}
+
+//================= STARTUP CU?NG B?C =================
+void startup_bldc()
+{
+   int8 seq[6] = {
+      0b00010001,
+      0b00100001,
+      0b00100010,
+      0b00001010,
+      0b00001100,
+      0b00010100
+   };
+
+   for(int i=0;i<60;i++)
+   {
+      output_d(seq[i%6]);
+      delay_ms(5);
+   }
+}
+
+//================= MAIN =================
+void main()
+{
+   set_tris_b(0xFF);
+   set_tris_d(0x00);
+   set_tris_c(0x00);
+   set_tris_a(0xFF);
+   port_b_pullups(TRUE);
+
+   setup_adc_ports(sAN0);
+   setup_adc(ADC_CLOCK_INTERNAL);
+   set_adc_channel(0);
+
+   setup_timer_2(T2_DIV_BY_16, 255, 1);
+   setup_ccp1(CCP_PWM);
+
+   output_d(0x00);
+   set_pwm1_duty(0);
+
+   while(TRUE)
+   {
+      // Ð?c Hall
+      //a = input(HALL_A);
+      //b = input(HALL_B);
+      //c = input(HALL_C);
+      fake_hall_rotate();
+
+      // Ð?c t?c d?
+      adc_val = read_adc();
+      set_pwm1_duty(adc_val);   // PWM -> SD
+
+      // Nút B?T / T?T
+      if(!input(BAT_TAT))
+      {
+         delay_ms(20);
+         if(!input(BAT_TAT))
+         {
+            while(!input(BAT_TAT));
+            state = !state;
+            if(state) startup_bldc();
+         }
+      }
+
+      // Nút Ð?O CHI?U
+      if(!input(THUAN_NGHICH))
+      {
+         delay_ms(20);
+         if(!input(THUAN_NGHICH))
+         {
+            while(!input(THUAN_NGHICH));
+            dir = !dir;
+            startup_bldc();
+         }
+      }
+
+      // Ði?u khi?n d?ng co
+      if(!state)
+      {
+         output_d(0x00);
+         set_pwm1_duty(0);
+      }
+      else
+      {
+         if(!dir) quay_thuan();
+         else quay_nghich();
+      }
+   }
+}
+

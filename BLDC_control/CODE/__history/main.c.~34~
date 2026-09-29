@@ -1,0 +1,103 @@
+#include <main.h>
+// Ð?m b?o trong main.h ho?c t?i dây dã khai báo #device adc=10
+#device ADC=10
+#define bat_tat PIN_B4
+#define thuan_nghich PIN_B5
+#define HallA PIN_B0
+#define HallB PIN_B1
+#define HallC PIN_B2
+//#define ana PIN_A0
+
+// Khai báo bi?n
+unsigned int16 tocdo=10; // Dùng int16 cho ADC 10-bit
+unsigned int16 pwm_val=0;
+int1 state=0; // Dùng int1 ti?t ki?m b? nh? cho bi?n tr?ng thái
+int1 dir=0;
+int1 a, b, c;
+
+void quaythuan()
+{
+   // S? d?ng && cho logic chu?n
+   if (a==1 && b==0 && c==1) {output_d(0b00010001);} // AH, BL
+   else if (input(HallA)==1 && input(HallB)==0 && input(HallC)==0) {output_d(0b00100001);} // AH, CL
+   else if (input(HallA)==1 && input(HallB)==1 && input(HallC)==0) {output_d(0b00100010);} // BH, CL
+   else if (input(HallA)==0 && input(HallB)==1 && input(HallC)==0) {output_d(0b00001010);} // BH, AL
+   else if (input(HallA)==0 && input(HallB)==1 && input(HallC)==1) {output_d(0b00001100);} // CH, AL
+   else if (input(HallA)==0 && input(HallB)==0 && input(HallC)==1) {output_d(0b00010100);} // CH, BL
+}
+
+void quaynghich()
+{
+   if (input(HallA)==1 && input(HallB)==0 && input(HallC)==1) {output_d(0b00100001);}
+   else if (input(HallA)==1 && input(HallB)==0 && input(HallC)==0) {output_d(0b00010001);}
+   else if (input(HallA)==1 && input(HallB)==1 && input(HallC)==0) {output_d(0b00001100);}
+   else if (input(HallA)==0 && input(HallB)==1 && input(HallC)==0) {output_d(0b00010100);}
+   else if (input(HallA)==0 && input(HallB)==1 && input(HallC)==1) {output_d(0b00100010);}
+   else if (input(HallA)==0 && input(HallB)==0 && input(HallC)==1) {output_d(0b00001010);}
+}
+
+void main()
+{
+   set_tris_b(0xff); // Port B Input
+   set_tris_d(0x00); // Port D Output
+   set_tris_c(0x00); // Port C Output (cho PWM)
+   set_tris_a(0x01); // Port A Input
+   // Kích ho?t di?n tr? treo cho Port B (quan tr?ng cho nút nh?n n?i d?t)
+   port_b_pullups(TRUE); 
+
+   setup_adc_ports(sAN0);
+   setup_adc(ADC_CLOCK_INTERNAL);
+   set_adc_channel(0);
+
+   // Timer 2: Prescaler 16, Period 255 => Max PWM value cho l?nh set là 1023
+   setup_timer_2(T2_DIV_BY_16, 255, 1);
+   setup_ccp1(CCP_PWM);
+
+   // Kh?i t?o tr?ng thái d?ng an toàn
+   output_d(0x00); 
+   while(TRUE)
+   {
+      // 1. C?P NH?T C?M BI?N (Ph?i n?m trong vòng l?p)
+      
+      // 2. X? lý t?c d?
+      tocdo = read_adc();
+      // Logic ngu?c do chân SD: ADC càng l?n -> PWM càng l?n -> SD càng t?t -> Ð?ng co ch?m
+      // N?u mu?n thu?n chi?u kim d?ng h? bi?n tr?, hãy d?o giá tr?:
+      pwm_val = tocdo; 
+      set_pwm1_duty(pwm_val);
+
+      // 3. X? lý nút B?t/T?t
+      if(input(bat_tat)==0)
+      {
+         delay_ms(20);
+         if(input(bat_tat)==0)
+         {
+            while(input(bat_tat)==0); // Ch? nh? phím
+            state = !state;
+         }
+      }
+
+      // 4. X? lý nút Ð?o chi?u
+      if(input(thuan_nghich)==0)
+      {
+         delay_ms(20);
+         if(input(thuan_nghich)==0)
+         {
+            while(input(thuan_nghich)==0);
+            dir = !dir;
+         }
+      }
+
+      // 5. Ði?u khi?n Output
+      if(state==0) // Tr?ng thái T?T
+      {
+         output_d(0x00); // T?t toàn b? MOSFET d? tránh ng?n m?ch
+      }
+      else // Tr?ng thái B?T
+      {
+         if(dir==0) quaythuan();
+         else quaynghich();
+      }     
+   }
+}
+

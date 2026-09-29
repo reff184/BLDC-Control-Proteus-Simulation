@@ -1,0 +1,20 @@
+#include <main.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+char yeucau;
+int l=0, i=0;
+unsigned int pwm=0;
+void main()
+{
+   set_tris_b(0xff);
+   //option_reg=0;
+   set_tris_d(0);
+   adc_init();
+   l=adc_get_sample(0);
+   while(TRUE)
+   {
+      //TODO: User Code
+   }
+
+}
