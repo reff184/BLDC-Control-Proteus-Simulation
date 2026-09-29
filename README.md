@@ -1,3 +1,3 @@
 # BLDC-Control-Proteus-Simulation
-Proteus version 8.16
-PCWHD version 5
+- Proteus version 8.16
+- PCWHD version 5
